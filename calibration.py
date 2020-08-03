@@ -1,6 +1,7 @@
 import os 
 import json
 import argparse
+from collections import OrderedDict
 import numpy as np
 import cv2
 import pandas as pd
@@ -9,7 +10,7 @@ from tqdm import tqdm
 
 parser = argparse.ArgumentParser(description='Calibrate multiple cameras.')
 parser.add_argument('--json', type=str, default='data/input.json', help='json file defining all input files')
-parser.add_argument('--path-res', type=str, default='res', help='folder to save result')
+parser.add_argument('--path-res', type=str, default='result', help='folder to save result')
 parser.add_argument('--iter', type=int, default=10, help='iteration to optimize')
 
 args = parser.parse_args()
@@ -56,6 +57,8 @@ for i in tqdm(range(args.iter)):
         mtx = cameras[key]['calib']['K'] = np.array(cameras[key]['calib']['K'])
         imageSize = tuple(cameras[key]['calib']['imgSize'])
         retval, mtx, dist, rvec, tvec = cv2.calibrateCamera([object_points], [image_points], imageSize, mtx, dist, flags=flag)
+        cameras[key]['calib']['K'] = mtx
+        cameras[key]['calib']['dist'] = dist
         cameras[key]['calib']['R'] = rvec[0]
         cameras[key]['calib']['t'] = tvec[0]
         camera_matrixs[key] = mtx @ np.hstack((cv2.Rodrigues(rvec[0])[0], tvec[0]))
@@ -80,5 +83,17 @@ for i in tqdm(range(args.iter)):
                 cms.append(camera_matrixs[cam])
             xyz, err = get_triangulation(xys, cms)
             new_3d_pts.append([tgt] + xyz.tolist())
-
+    
     df_3d_pts_all = df_3d_pts.append(pd.DataFrame(new_3d_pts).set_index(0))
+
+
+for key in cameras:
+    calib = OrderedDict()
+    calib['name'] = cameras[key]['calib']['name']
+    calib['K'] = cameras[key]['calib']['K'].tolist()
+    calib['distCoef'] = cameras[key]['calib']['distCoef']
+    calib['R'] = cameras[key]['calib']['R'].reshape(-1).tolist()
+    calib['t'] = cameras[key]['calib']['t'].reshape(-1).tolist()
+    calib['imgSize'] = cameras[key]['calib']['imgSize']
+    with open(os.path.join(args.path_res, cameras[key]['calib_file']), 'w') as outfile:  
+        json.dump(calib, outfile, indent = 2)

@@ -27,19 +27,53 @@ for key in cameras:
         camera['calib'] = json.load(json_file)
     camera['2d_pts'] = pd.read_csv(os.path.join(path, camera['points_file']), sep = ' ', header=None, index_col=0)
     camera['2d_pts_unknown'] = camera['2d_pts'].index.difference(df_3d_pts.index)
-    
-
+args.dist = True
 flag = cv2.CALIB_USE_INTRINSIC_GUESS + cv2.CALIB_FIX_K1 + cv2.CALIB_FIX_K2 + cv2.CALIB_FIX_K3 + cv2.CALIB_FIX_K4 + cv2.CALIB_FIX_K5 + cv2.CALIB_FIX_K6 + cv2.CALIB_ZERO_TANGENT_DIST 
 dist = np.zeros((1,5))
 
+camera_matrixs = dict()
 for key in cameras:
     idx_inter = cameras[key]['2d_pts'].index.intersection(df_3d_pts.index)
     object_points = df_3d_pts.loc[idx_inter, 1:].to_numpy(dtype=np.float32)
     image_points = cameras[key]['2d_pts'].loc[idx_inter, 1:].to_numpy(dtype=np.float32)
-    mtx = np.array(cameras[key]['calib']['K'])
+    mtx = cameras[key]['calib']['K'] = np.array(cameras[key]['calib']['K'])
     imageSize = tuple(cameras[key]['calib']['imgSize'])
-    print(cameras[key]['calib'])
     retval, mtx, dist, rvec, tvec = cv2.calibrateCamera([object_points], [image_points], imageSize, mtx, dist, flags=flag)
-    cameras[key]['R'] = rvec[0]
-    cameras[key]['t'] = tvec[0]
+    cameras[key]['calib']['R'] = rvec[0]
+    cameras[key]['calib']['t'] = tvec[0]
+    camera_matrixs[key] = mtx @ np.hstack((cv2.Rodrigues(rvec[0])[0], tvec[0]))
+    
+unknown_2d_pts = dict()
+for key in cameras:
+    tgts = cameras[key]['2d_pts_unknown']
+    for tgt in tgts:
+        if tgt in unknown_2d_pts:
+            unknown_2d_pts[tgt][key] = cameras[key]['2d_pts'].loc[tgt].to_numpy()
+        else:
+            unknown_2d_pts[tgt] = {key:cameras[key]['2d_pts'].loc[tgt].to_numpy()}
 
+def get_triangulation(xys, camera_matrixs):
+    """
+    param xys : list of points in cameras
+    param camera_matrixs : np.array{ v x 3 x 4 }
+    return X,s : the point in 3d space and corresponding singular value
+    """
+    A = np.empty((0,4))
+    for x, camera_matrix in zip(xys, camera_matrixs):
+        A = np.append(A, x[:2].reshape(2,1) @ camera_matrix[2:3] - camera_matrix[:2], axis = 0)
+    
+    A /= np.linalg.norm(A[:,:3], axis=-1, keepdims=True)
+    xyz, res, _, _ =  np.linalg.lstsq(A[:,:3], -A[:,-1:], rcond=None)
+    return xyz[:,0], res
+
+new_3d_pts = []
+for tgt in unknown_2d_pts:
+    if len(unknown_2d_pts[tgt]) >= 2:
+        xys = []
+        cms = []
+        for cam in unknown_2d_pts[tgt]:
+            xys.append(unknown_2d_pts[tgt][cam])
+            cms.append(camera_matrixs[cam])
+        new_3d_pts.append([tgt] + get_triangulation(xys, cms)[0].tolist())
+print(new_3d_pts)
+        

@@ -18,16 +18,15 @@ args = parser.parse_args()
 with open(args.json) as json_file:  
     data = json.load(json_file)
 
-path = os.path.dirname(args.json)
-df_3d_pts = pd.read_csv(os.path.join(path, data['3d_points_file']), sep = ' ', header=None, index_col=0)
+df_3d_pts = pd.read_csv(data['3d_points_file'], sep = ' ', header=None, index_col=0)
 
 cameras = data['cameras']
 for key in cameras:
     camera = cameras[key]
-    camera['img'] = cv2.imread(os.path.join(path, camera['img_file']))
-    with open(os.path.join(path, camera['calib_file'])) as json_file:  
+    camera['img'] = cv2.imread(camera['img_file'])
+    with open(camera['calib_file']) as json_file:  
         camera['calib'] = json.load(json_file)
-    camera['2d_pts'] = pd.read_csv(os.path.join(path, camera['points_file']), sep = ' ', header=None, index_col=0)
+    camera['2d_pts'] = pd.read_csv(camera['points_file'], sep = ' ', header=None, index_col=0)
     camera['2d_pts_unknown'] = camera['2d_pts'].index.difference(df_3d_pts.index)
 args.dist = True
 flag = cv2.CALIB_USE_INTRINSIC_GUESS + cv2.CALIB_FIX_K1 + cv2.CALIB_FIX_K2 + cv2.CALIB_FIX_K3 + cv2.CALIB_FIX_K4 + cv2.CALIB_FIX_K5 + cv2.CALIB_FIX_K6 + cv2.CALIB_ZERO_TANGENT_DIST 
@@ -95,5 +94,5 @@ for key in cameras:
     calib['R'] = cameras[key]['calib']['R'].reshape(-1).tolist()
     calib['t'] = cameras[key]['calib']['t'].reshape(-1).tolist()
     calib['imgSize'] = cameras[key]['calib']['imgSize']
-    with open(os.path.join(args.path_res, cameras[key]['calib_file']), 'w') as outfile:  
+    with open(os.path.join(args.path_res, os.path.basename(cameras[key]['calib_file'])), 'w') as outfile:  
         json.dump(calib, outfile, indent = 2)

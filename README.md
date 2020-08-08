@@ -10,7 +10,7 @@ Optimize(refine) calibration of multiple camera. The camera parameters are obtai
 * python
 * numpy
 * opencv
-* pands
+* pandas
 
 ### Input Description
 (input).json:

@@ -101,14 +101,26 @@ for key in df_3d_pts_all.index:
         colors[key] = np.random.randint(256, size=3)
     else:
         colors[key] = np.zeros(3)
-
+print('camera\terr1\terr2')
 for c1 in cameras:
     img = cameras[c1]['img']
+    errs_predefined = []
+    errs_new = []
     for tgt in cameras[c1]['2d_pts'].index:
         if tgt not in df_3d_pts_all.index:
             continue
         color = colors[tgt]
         cv2.circle(img, tuple(cameras[c1]['2d_pts'].loc[tgt].tolist()), 5, color.tolist(), 4)
+        if tgt in df_3d_pts_all.index:
+            pt = camera_matrixs[c1] @ np.append(df_3d_pts_all.loc[tgt], 1)
+            pt = (pt/pt[-1])[:-1]
+            err = (np.linalg.norm(pt - cameras[c1]['2d_pts'].loc[tgt]))
+            if tgt in df_3d_pts.index:
+                errs_predefined.append(err)
+            else:
+                errs_new.append(err)
+    print(c1, '{:.3f}\t{:.3f}'.format(np.array(errs_predefined).mean(), np.array(errs_predefined+errs_new).mean()))
+
     for c2 in cameras:
         if c1 == c2:
             continue

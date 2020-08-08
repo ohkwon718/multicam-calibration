@@ -38,8 +38,8 @@ Optimize(refine) calibration of multiple camera. The camera parameters are obtai
 
 (3d_points).txt:
 ```
-target1 (float) (float) (float) \\ 3d potion (x, y, z)
-target2 (float) (float) (float) \\ 3d potion (x, y, z)
+target1 (float) (float) (float) \\ 3d position (x, y, z)
+target2 (float) (float) (float) \\ 3d position (x, y, z)
 ...
 ```
 
@@ -56,6 +56,6 @@ target2 (float) (float) (float) \\ 3d potion (x, y, z)
 
 (cam0).txt:
 ```
-target1 (int) (int) \\ pixel potion (x, y)
-target2 (int) (int) \\ pixel potion (x, y)
+target1 (int) (int) \\ pixel (x, y)
+target2 (int) (int) \\ pixel (x, y)
 ```

@@ -5,16 +5,15 @@ from collections import OrderedDict
 import numpy as np
 import cv2
 import pandas as pd
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 parser = argparse.ArgumentParser(description='Calibrate multiple cameras.')
 parser.add_argument('--json', type=str, default='data/input.json', help='json file defining all input files')
 parser.add_argument('--path-res', type=str, default='result', help='folder to save result')
 parser.add_argument('--iter', type=int, default=10, help='iteration to optimize')
-
 args = parser.parse_args()
 
+os.makedirs(args.path_res, exist_ok=True)
 with open(args.json) as json_file:  
     data = json.load(json_file)
 
@@ -28,7 +27,7 @@ for key in cameras:
         camera['calib'] = json.load(json_file)
     camera['2d_pts'] = pd.read_csv(camera['points_file'], sep = ' ', header=None, index_col=0)
     camera['2d_pts_unknown'] = camera['2d_pts'].index.difference(df_3d_pts.index)
-args.dist = True
+
 flag = cv2.CALIB_USE_INTRINSIC_GUESS + cv2.CALIB_FIX_K1 + cv2.CALIB_FIX_K2 + cv2.CALIB_FIX_K3 + cv2.CALIB_FIX_K4 + cv2.CALIB_FIX_K5 + cv2.CALIB_FIX_K6 + cv2.CALIB_ZERO_TANGENT_DIST 
 dist = np.zeros((1,5))
 

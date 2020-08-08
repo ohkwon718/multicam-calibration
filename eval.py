@@ -97,7 +97,10 @@ df_3d_pts_all = df_3d_pts.append(pd.DataFrame(new_3d_pts).set_index(0))
 colors = {}
 np.random.seed(0)
 for key in df_3d_pts_all.index:
-    colors[key] = np.random.randint(256, size=3)
+    if key in df_3d_pts.index:
+        colors[key] = np.random.randint(256, size=3)
+    else:
+        colors[key] = np.zeros(3)
 
 for c1 in cameras:
     img = cameras[c1]['img']
@@ -116,7 +119,11 @@ for c1 in cameras:
                 continue
             color = colors[tgt]
             l = np.append(cameras[c2]['2d_pts'].loc[tgt],1) @ fundamental_matrixs[c1,c2]
-            w = cameras[c1]['calib']['imgSize'][0]
-            cv2.line(img, (0, int(-l[2]/l[1])), (w , int(-(l[0]*w+l[2])/l[1])), color.tolist(), 1)
-                
+            w1 = int(epipoles[c1,c2][0])
+            
+            w2 = cameras[c1]['2d_pts'].loc[tgt, 1] 
+            w2 = int((l[1]**2*cameras[c1]['2d_pts'].loc[tgt, 1] - l[0]*l[1]*cameras[c1]['2d_pts'].loc[tgt, 2] - l[0]*l[2])/(l[0]**2 + l[1]**2))
+            w2 = w2 - 1 if cameras[c1]['2d_pts'].loc[tgt, 1] < w1 else w2 + 1
+            cv2.line(img, (w1, int(-(l[0]*w1+l[2])/l[1])), (w2 , int(-(l[0]*w2+l[2])/l[1])), color.tolist(), 1)
+            
     cv2.imwrite(os.path.join(args.path_res, c1+'.png'), img)

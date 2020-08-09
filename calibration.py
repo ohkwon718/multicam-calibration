@@ -10,7 +10,7 @@ from tqdm import tqdm
 parser = argparse.ArgumentParser(description='Calibrate multiple cameras.')
 parser.add_argument('--json', type=str, default='data/input.json', help='json file defining all input files')
 parser.add_argument('--path-res', type=str, default='result', help='folder to save result')
-parser.add_argument('--iter', type=int, default=10, help='iteration to optimize')
+parser.add_argument('--iter', type=int, default=100, help='iteration to optimize')
 args = parser.parse_args()
 
 os.makedirs(args.path_res, exist_ok=True)
@@ -48,27 +48,29 @@ def get_triangulation(xys, camera_matrixs):
 df_3d_pts_all = df_3d_pts
 for i in tqdm(range(args.iter)):
     camera_matrixs = dict()
-    for key in cameras:
-        idx_inter = cameras[key]['2d_pts'].index.intersection(df_3d_pts_all.index)
+    cameras_valid = []
+    for cam in cameras:
+        idx_inter = cameras[cam]['2d_pts'].index.intersection(df_3d_pts_all.index)
         object_points = df_3d_pts_all.loc[idx_inter, 1:].to_numpy(dtype=np.float32)
-        image_points = cameras[key]['2d_pts'].loc[idx_inter, 1:].to_numpy(dtype=np.float32)
-        mtx = cameras[key]['calib']['K'] = np.array(cameras[key]['calib']['K'])
-        imageSize = tuple(cameras[key]['calib']['imgSize'])
+        image_points = cameras[cam]['2d_pts'].loc[idx_inter, 1:].to_numpy(dtype=np.float32)
+        mtx = cameras[cam]['calib']['K'] = np.array(cameras[cam]['calib']['K'])
+        imageSize = tuple(cameras[cam]['calib']['imgSize'])
         retval, mtx, dist, rvec, tvec = cv2.calibrateCamera([object_points], [image_points], imageSize, mtx, dist, flags=flag)
-        cameras[key]['calib']['K'] = mtx
-        cameras[key]['calib']['dist'] = dist
-        cameras[key]['calib']['R'] = rvec[0]
-        cameras[key]['calib']['t'] = tvec[0]
-        camera_matrixs[key] = mtx @ np.hstack((cv2.Rodrigues(rvec[0])[0], tvec[0]))
+        cameras[cam]['calib']['K'] = mtx
+        cameras[cam]['calib']['dist'] = dist
+        cameras[cam]['calib']['R'] = rvec[0]
+        cameras[cam]['calib']['t'] = tvec[0]
+        camera_matrixs[cam] = mtx @ np.hstack((cv2.Rodrigues(rvec[0])[0], tvec[0]))
+        cameras_valid.append(cam)
         
     unknown_2d_pts = dict()
-    for key in cameras:
-        tgts = cameras[key]['2d_pts_unknown']
+    for cam in cameras_valid:
+        tgts = cameras[cam]['2d_pts_unknown']
         for tgt in tgts:
             if tgt in unknown_2d_pts:
-                unknown_2d_pts[tgt][key] = cameras[key]['2d_pts'].loc[tgt].to_numpy()
+                unknown_2d_pts[tgt][cam] = cameras[cam]['2d_pts'].loc[tgt].to_numpy()
             else:
-                unknown_2d_pts[tgt] = {key:cameras[key]['2d_pts'].loc[tgt].to_numpy()}
+                unknown_2d_pts[tgt] = {cam:cameras[cam]['2d_pts'].loc[tgt].to_numpy()}
 
     idxs = []
     new_3d_pts = []
@@ -81,17 +83,17 @@ for i in tqdm(range(args.iter)):
                 cms.append(camera_matrixs[cam])
             xyz, err = get_triangulation(xys, cms)
             new_3d_pts.append([tgt] + xyz.tolist())
-    
-    df_3d_pts_all = df_3d_pts.append(pd.DataFrame(new_3d_pts).set_index(0))
+    if len(new_3d_pts) > 0:
+        df_3d_pts_all = df_3d_pts.append(pd.DataFrame(new_3d_pts).set_index(0))
 
 
-for key in cameras:
+for cam in cameras:
     calib = OrderedDict()
-    calib['name'] = cameras[key]['calib']['name']
-    calib['K'] = cameras[key]['calib']['K'].tolist()
-    calib['distCoef'] = cameras[key]['calib']['distCoef']
-    calib['R'] = cameras[key]['calib']['R'].reshape(-1).tolist()
-    calib['t'] = cameras[key]['calib']['t'].reshape(-1).tolist()
-    calib['imgSize'] = cameras[key]['calib']['imgSize']
-    with open(os.path.join(args.path_res, os.path.basename(cameras[key]['calib_file'])), 'w') as outfile:  
+    calib['name'] = cameras[cam]['calib']['name']
+    calib['K'] = cameras[cam]['calib']['K'].tolist()
+    calib['distCoef'] = cameras[cam]['calib']['distCoef']
+    calib['R'] = cameras[cam]['calib']['R'].reshape(-1).tolist()
+    calib['t'] = cameras[cam]['calib']['t'].reshape(-1).tolist()
+    calib['imgSize'] = cameras[cam]['calib']['imgSize']
+    with open(os.path.join(args.path_res, os.path.basename(cameras[cam]['calib_file'])), 'w') as outfile:  
         json.dump(calib, outfile, indent = 2)

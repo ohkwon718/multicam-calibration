@@ -92,7 +92,9 @@ for tgt in unknown_2d_pts:
         xyz, err = get_triangulation(xys, cms)
         new_3d_pts.append([tgt] + xyz.tolist())
 
-df_3d_pts_all = df_3d_pts.append(pd.DataFrame(new_3d_pts).set_index(0))
+df_3d_pts_all = df_3d_pts
+if len(new_3d_pts) > 0:
+    df_3d_pts_all = df_3d_pts.append(pd.DataFrame(new_3d_pts).set_index(0))
 
 colors = {}
 np.random.seed(0)
